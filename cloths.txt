@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clothly — Clothes Delivery App (Demo)</title>
+  <style>
+    :root{--accent:#ff6b6b;--muted:#6b7280;--bg:#f7f7fb;--card:#ffffff}
+    *{box-sizing:border-box}
+    body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin:0; background:var(--bg); color:#111}
+    header{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;background:linear-gradient(90deg,#fff 0,#fff);border-bottom:1px solid #e6e6ee}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#ffb86b);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+    .search{flex:1;margin:0 20px}
+    .search input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #e3e3f0;background:#fff}
+    main{display:grid;grid-template-columns:1fr 380px;gap:24px;padding:24px}
+    .catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:18px}
+    .card{background:var(--card);border-radius:12px;padding:14px;border:1px solid #ececf5;box-shadow:0 6px 18px rgba(16,24,40,0.04)}
+    .card img{width:100%;height:170px;object-fit:cover;border-radius:8px}
+    .meta{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+    .price{font-weight:700}
+    .muted{color:var(--muted);font-size:13px}
+    .btn{display:inline-block;padding:8px 12px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+    .secondary{background:#fff;border:1px solid #ececf5;color:#111}
+    .sidebar{position:sticky;top:20px}
+    .cart-list{max-height:380px;overflow:auto;margin-top:12px;display:flex;flex-direction:column;gap:10px}
+    .cart-item{display:flex;gap:12px;align-items:center}
+    .cart-item img{width:56px;height:56px;object-fit:cover;border-radius:8px}
+    footer{padding:20px;text-align:center;color:var(--muted);font-size:13px}
+    .badge{background:#f1f5f9;padding:4px 8px;border-radius:999px;font-weight:600}
+    .controls{display:flex;gap:8px;align-items:center}
+    .checkout-box{background:var(--card);border-radius:12px;padding:14px;border:1px solid #ececf5}
+    /* responsive */
+    @media (max-width:900px){main{grid-template-columns:1fr;padding:12px} .sidebar{position:static}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">CL</div>
+      <div>
+        <div style="font-weight:700">Clothly</div>
+        <div class="muted" style="font-size:13px">Fast clothes delivery</div>
+      </div>
+    </div>
+    <div class="search">
+      <input id="search" placeholder="Search clothes, brands, sizes..." />
+    </div>
+    <div class="controls">
+      <div class="muted">Delivery in 30–45 mins</div>
+      <button id="view-cart" class="btn" style="margin-left:12px">View Cart <span id="cart-count" style="margin-left:8px" class="badge">0</span></button>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <h2 style="margin:0">Trending</h2>
+        <div class="muted">Quality picks for you</div>
+      </div>
+
+      <div id="catalog" class="catalog">
+        <!-- product cards inserted by JS -->
+      </div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="checkout-box">
+        <h3 style="margin-top:0">Your Cart</h3>
+        <div id="cart-list" class="cart-list"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+          <div class="muted">Total</div>
+          <div style="font-weight:800">₹ <span id="total">0</span></div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button id="checkout" class="btn">Checkout</button>
+          <button id="clear-cart" class="secondary">Clear</button>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;text-align:center;color:var(--muted)">
+        <small>Demo app — payments simulated through BankServer singleton.</small>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    Built with ❤️ — demo for learning. Source: single-file HTML/CSS/JS.
+  </footer>
+
+  <script>
+    /*******************************
+     * BankServer singleton
+     * - constructor protected via a private symbol token
+     * - use BankServer.getInstance() to obtain the single instance
+     * - methods: processPayment(amount, meta), getTransactions(), getBalance()
+     *******************************/
+
+    const BankServer = (function(){
+      // private key used only here to allow constructing once
+      const PRIVATE = Symbol('BankServerPrivate');
+
+      class BankServerClass {
+        constructor(key){
+          if(key !== PRIVATE) throw new Error('BankServer constructor is private. Use BankServer.getInstance()');
+          this.transactions = [];
+          this._balance = 100000; // demo initial bank float in paise/rupees as preferred
+        }
+
+        // simulate an async payment processing (returns a Promise)
+        processPayment(amount, meta = {}){
+          return new Promise((resolve) => {
+            // simple validation
+            const tx = {
+              id: 'tx_' + Math.random().toString(36).slice(2,9),
+              amount: Number(amount),
+              meta,
+              at: new Date().toISOString(),
+              status: 'success'
+            };
+            // update internal ledger
+            this.transactions.push(tx);
+            this._balance += Number(amount); // for demo, treat as incoming credit
+            // simulate latency
+            setTimeout(()=> resolve(Object.assign({message:'Processed by BankServer'}, tx)), 400);
+          });
+        }
+
+        getTransactions(){
+          // return a copy to prevent external mutation
+          return this.transactions.slice();
+        }
+
+        getBalance(){
+          return this._balance;
+        }
+
+        // ability to reset only for demo/testing
+        _resetForDemo(){ this.transactions = []; this._balance = 100000 }
+      }
+
+      return class BankServerWrapper {
+        static getInstance(){
+          if(!this._instance) this._instance = new BankServerClass(PRIVATE);
+          return this._instance;
+        }
+      }
+    })();
+
+    // USAGE EXAMPLE (from within app):
+    // const bank = BankServer.getInstance();
+    // bank.processPayment(499, {orderId:'order_123'}).then(res => console.log(res));
+
+
+    /*******************************
+     * App logic — product list, cart, checkout
+     *******************************/
+
+    const PRODUCTS = [
+      {id:'p1', title:'Ocean Blue T-Shirt', price:399, img:'https://images.unsplash.com/photo-1526948128573-703ee1aeb6fa?auto=format&fit=crop&w=800&q=60'},
+      {id:'p2', title:'Classic White Shirt', price:799, img:'https://images.unsplash.com/photo-1542060744-1b9a3d2b9b23?auto=format&fit=crop&w=800&q=60'},
+      {id:'p3', title:'Black Hoodie', price:1199, img:'https://images.unsplash.com/photo-1520975919325-6c3f8bcf6b3b?auto=format&fit=crop&w=800&q=60'},
+      {id:'p4', title:'Summer Dress', price:999, img:'https://images.unsplash.com/photo-1520975919325-abc?auto=format&fit=crop&w=800&q=60'},
+      {id:'p5', title:'Khaki Pants', price:899, img:'https://images.unsplash.com/photo-1585396550007-8d0c2c9ecb3b?auto=format&fit=crop&w=800&q=60'},
+      {id:'p6', title:'Sport Shorts', price:299, img:'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=800&q=60'}
+    ];
+
+    const state = { cart: {} };
+
+    function renderCatalog(list){
+      const container = document.getElementById('catalog'); container.innerHTML = '';
+      list.forEach(p => {
+        const card = document.createElement('div'); card.className='card';
+        card.innerHTML = `
+          <img src="${p.img}" alt="${p.title}" />
+          <div style="margin-top:8px">
+            <div style="font-weight:700">${p.title}</div>
+            <div class="meta">
+              <div class="muted">Sizes: S M L</div>
+              <div class="price">₹ ${p.price}</div>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+              <button class="btn" data-id="${p.id}">Add</button>
+              <button class="secondary" data-id="${p.id}" style="padding:8px 10px">Details</button>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function updateCartUI(){
+      const list = document.getElementById('cart-list'); list.innerHTML='';
+      const cartItems = Object.values(state.cart);
+      let total = 0;
+      cartItems.forEach(ci => {
+        total += ci.price * ci.qty;
+        const el = document.createElement('div'); el.className='cart-item';
+        el.innerHTML = `
+          <img src="${ci.img}" />
+          <div style="flex:1">
+            <div style="font-weight:700">${ci.title}</div>
+            <div class="muted">₹ ${ci.price} × ${ci.qty}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:center">
+            <button class="secondary" data-act="inc" data-id="${ci.id}">+</button>
+            <button class="secondary" data-act="dec" data-id="${ci.id}">−</button>
+          </div>
+        `;
+        list.appendChild(el);
+      });
+      document.getElementById('total').textContent = total;
+      document.getElementById('cart-count').textContent = cartItems.reduce((s,i)=>s+i.qty,0) || 0;
+    }
+
+    document.addEventListener('click', (e)=>{
+      const addBtn = e.target.closest('button[data-id]');
+      if(addBtn && addBtn.textContent.trim()==='Add'){
+        const id = addBtn.dataset.id; addToCart(id);
+      }
+      if(e.target.id==='checkout'){
+        checkout();
+      }
+      if(e.target.id==='clear-cart'){
+        state.cart = {}; updateCartUI();
+      }
+      const control = e.target.closest('button[data-act]');
+      if(control){
+        const id = control.dataset.id; const act = control.dataset.act;
+        if(act==='inc') changeQty(id, +1);
+        if(act==='dec') changeQty(id, -1);
+      }
+      if(e.target.id==='view-cart'){
+        // scroll to sidebar
+        window.scrollTo({top:document.querySelector('.sidebar').offsetTop, behavior:'smooth'});
+      }
+    });
+
+    function addToCart(id){
+      const p = PRODUCTS.find(x=>x.id===id); if(!p) return;
+      if(!state.cart[id]) state.cart[id] = {...p, qty:1}; else state.cart[id].qty +=1;
+      updateCartUI();
+    }
+
+    function changeQty(id, delta){
+      const item = state.cart[id]; if(!item) return;
+      item.qty += delta; if(item.qty<=0) delete state.cart[id]; updateCartUI();
+    }
+
+    function checkout(){
+      const items = Object.values(state.cart);
+      if(items.length===0){ alert('Cart is empty'); return; }
+      const total = items.reduce((s,i)=>s + i.price*i.qty, 0);
+
+      // call BankServer singleton to process payment
+      const bank = BankServer.getInstance();
+      const orderId = 'order_' + Math.random().toString(36).slice(2,8);
+      bank.processPayment(total, {orderId, items}).then(res => {
+        // on success
+        alert('Payment success — order ID: ' + orderId + '\nBank tx: '+res.id);
+        // reset cart for demo
+        state.cart = {};
+        updateCartUI();
+        console.log('Bank transactions:', bank.getTransactions());
+      }).catch(err => {
+        alert('Payment failed: ' + err.message);
+      });
+    }
+
+    // search
+    document.getElementById('search').addEventListener('input', (e)=>{
+      const q = e.target.value.trim().toLowerCase();
+      renderCatalog(PRODUCTS.filter(p => p.title.toLowerCase().includes(q)));
+    });
+
+    // init
+    renderCatalog(PRODUCTS);
+    updateCartUI();
+
+    // expose BankServer to window for easy debugging (demo only)
+    window.BankServer = BankServer;
+  </script>
+</body>
+</html>
